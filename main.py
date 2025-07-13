@@ -2,7 +2,6 @@ from langgraph.graph import StateGraph, END
 from typing import TypedDict, Annotated, Optional
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
-from langgraph.checkpoint.memory import MemorySaver
 from langchain_groq import ChatGroq
 from langgraph.graph.message import add_messages
 import requests
@@ -315,8 +314,7 @@ workflow.add_edge("Execute_tools", "Agente_SDR")
 workflow.add_edge("Enviar_mensagem", "Salvar_mensagem_ai")
 workflow.add_edge("Salvar_mensagem_ai", END)
 
-memory = MemorySaver()
-grafo = workflow.compile(checkpointer=memory)
+grafo = workflow.compile()
 
 if __name__ == "__main__":
     entrada = {
@@ -325,10 +323,8 @@ if __name__ == "__main__":
         "tipo": "human"
     }
 
-    config = {"configurable": {"thread_id": entrada["numero"]}}
-
     try:
-        saida = grafo.invoke(entrada, config=config)
+        saida = grafo.invoke(entrada)
         print("🎉 Processamento concluído!")
             
     except Exception as e:
