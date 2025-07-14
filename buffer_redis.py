@@ -8,12 +8,20 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path="/home/angel/python/agente_SDR/.env")
 
 # --- Configurações ---
-# Use suas variáveis de ambiente para conectar
-redis_client = redis.Redis(host=os.getenv("IP_VPS"), port=6379, password=os.getenv("SENHA_REDIS"), db=0, decode_responses=True)
+redis_client = redis.Redis(
+    host=os.getenv("IP_VPS"), 
+    port=6379, 
+    password=os.getenv("SENHA_REDIS"), 
+    db=0, 
+    decode_responses=True
+)
 BUFFER_TIMEOUT = 10  # segundos
 
-# --- Parte 1: Função que recebe e agrupa as mensagens (seu "push buffer1") ---
 def adicionar_ao_buffer(numero: str, nova_mensagem: str):
+    """
+    Adiciona uma mensagem ao buffer de um número específico.
+    Reinicia o timer de timeout a cada nova mensagem.
+    """
     chave_conteudo = f"buffer:content:{numero}"
     chave_gatilho = f"buffer:trigger:{numero}"
 
@@ -27,7 +35,6 @@ def adicionar_ao_buffer(numero: str, nova_mensagem: str):
     redis_client.set(chave_conteudo, json.dumps(mensagens))
     redis_client.setex(chave_gatilho, BUFFER_TIMEOUT, 1)
 
-# --- Parte 2: O processo que age após o timeout (seus "Wait", "If", "Edit Fields" e "Delete") ---
 async def ouvinte_de_expiracao(callback: Callable[[str, str], Awaitable[None]]):
     """
     Ouve os eventos de expiração do Redis de forma eficiente.
@@ -47,28 +54,41 @@ async def ouvinte_de_expiracao(callback: Callable[[str, str], Awaitable[None]]):
             # Pega as mensagens agrupadas
             mensagens_json = redis_client.get(chave_conteudo)
             if mensagens_json:
-                # Junta tudo em um texto só (seu "Edit Fields")
+                # Junta tudo em um texto só
                 mensagens_lista = json.loads(mensagens_json)
-                texto_final = "\n".join(mensagens_lista) # Usando \n como no seu exemplo
+                texto_final = "\n".join(mensagens_lista)
                 
                 # Chama a função principal do seu agente
                 await callback(numero, texto_final)
                 
-                # Limpa o buffer (seu "Redis1 delete")
+                # Limpa o buffer
                 redis_client.delete(chave_conteudo)
         
         await asyncio.sleep(0.01)
 
-# --- Exemplo de como você usaria isso ---
-async def enviar_para_agente_ia(numero: str, texto: str):
-    """
-    Esta é a função final que realmente faz o trabalho.
-    """
-    print("\n" + "="*50)
-    print(f"ENVIANDO PARA O AGENTE | NÚMERO: {numero}")
-    print(f"TEXTO FINAL: \n{texto}")
-    print("="*50)
+# Variável global para controlar se o ouvinte já está rodando
+_ouvinte_ativo = False
 
-# Para rodar, você iniciaria o ouvinte como uma tarefa de background
-# e chamaria adicionar_ao_buffer a cada mensagem recebida.
-# asyncio.create_task(ouvinte_de_expiracao(enviar_para_agente_ia))
+def iniciar_ouvinte_background(callback: Callable[[str, str], Awaitable[None]]):
+    """
+    Função helper para iniciar o ouvinte em background usando asyncio.
+    Previne múltiplas instâncias do ouvinte.
+    """
+    global _ouvinte_ativo
+    
+    if _ouvinte_ativo:
+        print("⚠️ Ouvinte já está ativo, ignorando nova inicialização")
+        return None
+    
+    def executar_ouvinte():
+        global _ouvinte_ativo
+        _ouvinte_ativo = True
+        try:
+            asyncio.run(ouvinte_de_expiracao(callback))
+        finally:
+            _ouvinte_ativo = False
+    
+    import threading
+    thread = threading.Thread(target=executar_ouvinte, daemon=True)
+    thread.start()
+    return thread
