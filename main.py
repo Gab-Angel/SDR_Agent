@@ -3,6 +3,7 @@ from typing import TypedDict, Annotated, Optional
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph.message import add_messages
 import requests
 import os
@@ -27,7 +28,7 @@ headers = {
 }
 
 # CONEXÃO COM A GROQ 
-llm_groq = ChatGroq(api_key=os.getenv("GROQ_API_KEY"), model_name="llama3-70b-8192", temperature=0)
+llm_groq = ChatGroq(api_key=os.getenv("GROQ_API_KEY"), model_name="llama3-70b-8192", temperature=0.2)
 prompt_ia=""
 with open("/home/angel/python/agente_SDR/prompt_ai.txt", "r", encoding="utf-8") as file:
     prompt_ia = file.read()
@@ -194,8 +195,8 @@ def agente_sdr(state: Estado):
             supabase.table("chat_ia")
             .select("message")
             .eq("session_id", current_numero)
-            .order("id", desc=True)
-            .limit(15)
+            .order("id", desc=False)
+            .limit(20)
             .execute()
         )
         
@@ -204,7 +205,7 @@ def agente_sdr(state: Estado):
         if resultado.data:
             print(f"📚 Recuperando {len(resultado.data)} mensagens do histórico")
             
-            for msg_data in reversed(resultado.data):
+            for msg_data in resultado.data:
                 message = msg_data["message"]
                 
                 if message["type"] == "human":
