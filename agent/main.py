@@ -2,41 +2,21 @@ from langgraph.graph import StateGraph, END
 from typing import TypedDict, Annotated, Optional
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
-from langchain_groq import ChatGroq
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph.message import add_messages
 import requests
-import os
-from supabase import Client, create_client
-from dotenv import load_dotenv
 from langchain.tools import tool
+from integrations import supabase, llm_groq, url, headers
 
-load_dotenv(dotenv_path="/home/angel/python/agente_SDR/.env")
-
-# CONEXÂO COM SUPABASE
-supabase_url = os.getenv("PROJECT_URL_SUPABASE")
-supabase_key = os.getenv("API_KEY_SUPABASE")
-supabase: Client = create_client(supabase_url, supabase_key)
-
-# CONEXÃO COM EVOLUTION
-base_url_evo = os.getenv("BASE_URL_EVO")
-instance_token = os.getenv("API_KEY_EVO") 
-url = f"{base_url_evo}/message/sendText/agentei_ia"
-headers = {
-    "Content-Type": "application/json",
-    "apikey": instance_token
-}
-
-# CONEXÃO COM A GROQ 
-llm_groq = ChatGroq(api_key=os.getenv("GROQ_API_KEY"), model_name="llama3-70b-8192", temperature=0.2)
 prompt_ia=""
-with open("/home/angel/python/agente_SDR/prompt_ai.txt", "r", encoding="utf-8") as file:
+
+with open("/home/angel/python/agente_SDR/agent/prompt_ai.txt", "r", encoding="utf-8") as file:
     prompt_ia = file.read()
 
 # Variável global para armazenar o número atual (temporária)
 current_numero = None
 
 @tool(description="""
+Use essa tool SEMPRE que a conversa resultar na coleta de informações.
 Atualiza o nome do responsável e suas qualificações(sempre em formato JSON) nesse formato:
        {
         "buscando_escola": boolean,
@@ -251,18 +231,24 @@ def enviar_mensagem(state: Estado):
 
     ultima_mensagem = mensagem[-1]
     texto = ultima_mensagem.content
+    if "." in texto:
+        texto_picotado = texto.split(".")
+    elif "!" in texto:
+        texto_picotado = texto.split("!")
+    print('TEXTO PICOTADO:',texto_picotado)
+    for frase in texto_picotado:
+        if not frase =='':
+            payload = {
+                "number": numero,
+                "text": frase,
+                "delay": 2000
+            }
 
-    payload = {
-        "number": numero,
-        "text": texto,
-        "delay": 2000
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        print(f"✅ Mensagem enviada: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Erro ao enviar mensagem: {e}")
+            try:
+                response = requests.post(url, headers=headers, json=payload)
+                print(f"✅ Mensagem enviada: {response.status_code}")
+            except Exception as e:
+                print(f"❌ Erro ao enviar mensagem: {e}")
 
     return {}
 

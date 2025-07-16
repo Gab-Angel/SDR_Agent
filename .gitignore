@@ -1,1 +1,3 @@
 .env
+agente_SDR.egg-info/
+__pycache__/

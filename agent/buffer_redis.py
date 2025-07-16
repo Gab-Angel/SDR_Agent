@@ -5,7 +5,7 @@ from typing import Callable, Awaitable
 import os
 from dotenv import load_dotenv
 
-load_dotenv(dotenv_path="/home/angel/python/agente_SDR/.env")
+load_dotenv()
 
 # --- Configurações ---
 redis_client = redis.Redis(
@@ -56,7 +56,7 @@ async def ouvinte_de_expiracao(callback: Callable[[str, str], Awaitable[None]]):
             if mensagens_json:
                 # Junta tudo em um texto só
                 mensagens_lista = json.loads(mensagens_json)
-                texto_final = "\n".join(filter(None, map(str, mensagens_lista)))
+                texto_final = " ".join(filter(None, map(str, mensagens_lista)))
                 
                 # Chama a função principal do seu agente
                 await callback(numero, texto_final)
