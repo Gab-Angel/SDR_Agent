@@ -3,6 +3,7 @@ from langchain_core.messages import HumanMessage
 
 from main import grafo
 from buffer_redis import adicionar_ao_buffer, iniciar_ouvinte_background
+from audio_transcription import audio_transcription
 
 app = Flask(__name__)
 
@@ -44,12 +45,25 @@ async def processar_mensagens_agrupadas(numero: str, texto_final: str):
 def webhook():
     try:
         dados = request.get_json()
-        
+        print(dados)
+        messageType = dados['data'].get('messageType')
+
         if dados:
-            mensagem = dados['data']["message"].get("conversation")
+
+            if messageType == 'conversation':
+
+                mensagem = dados['data']["message"].get("conversation")
+                
+            elif messageType == 'audioMessage':
+
+                base64 = dados['data']["message"].get("base64")
+                print("Processando Audio...")
+                result = audio_transcription(audio_base64=base64)
+                mensagem = result["text"]
+            
             remoteJid = dados['data']["key"].get("remoteJid")
             numero = remoteJid.split('@')[0]
-
+        
             print(f"📲 Mensagem de: {numero}")
             print(f"💬 Conteúdo: {mensagem}")
 
